@@ -1,0 +1,51 @@
+services:
+  # Main Backend API
+  synix-api:
+    build: .
+    command: python run_api.py
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_PATH=/app/data/synix_rp_backend.db
+      - BACKEND_URL=http://localhost:8000
+      - FRONTEND_URL=https://sinister-tracker.vercel.app
+    networks:
+      - synix_network
+
+  # Discord Bot Service
+  synix-bot:
+    build: .
+    command: python launcher.py
+    env_file: .env
+    volumes:
+      - ./bridge:/app/bridge
+      - ./data:/app/data
+    environment:
+      - DB_PATH=/app/data/synix_rp_backend.db
+      - CONFIG_PATH=/app/config.json
+    networks:
+      - synix_network
+
+  # AI Infrastructure Manager
+  ai-operator:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: synix-ai-operator
+    env_file: .env
+    volumes:
+      - ./synix_root:/app/synix_root
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "3000:8080"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - synix-api
+    networks:
+      - synix_network
+
+networks:
+  synix_network:
+    driver: bridge

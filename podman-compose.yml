@@ -1,0 +1,37 @@
+version: '3.8'
+
+networks:
+  synix_network:
+    driver: bridge
+
+services:
+  # AI Model Engine
+  ollama:
+    image: docker.io/ollama/ollama:latest
+    container_name: ollama
+    networks:
+      - synix_network
+    volumes:
+      - ./ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  # AI Interface and Operator
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: synix-ai-operator
+    ports:
+      - "3000:8080"
+    networks:
+      - synix_network
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - ENABLE_TOOLS=true
+      - WEBUI_AUTH=true
+      - WEBUI_SECRET_KEY=
+    volumes:
+      - ./open-webui_data:/app/backend/data
+      - ./synix_root:/app/files
+      - /run/podman/podman.sock:/var/run/podman/podman.sock
+    depends_on:
+      - ollama
+    restart: unless-stopped

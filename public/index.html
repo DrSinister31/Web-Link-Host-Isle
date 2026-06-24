@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sinister's Park Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+    <style>
+        :root { --charcoal: #121212; --crimson: #dc143c; --text: #e0e0e0; }
+        body { margin: 0; display: flex; height: 100vh; background: var(--charcoal); color: var(--text); font-family: 'Inter', sans-serif; }
+        .sidebar { width: 320px; padding: 20px; border-right: 2px solid #333; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+        .crimson-title { color: var(--crimson); text-shadow: -1px -1px 0 #121212, 1px -1px 0 #121212, -1px 1px 0 #121212, 1px 1px 0 #121212; font-size: 1.8rem; text-align: center; margin-bottom: 10px; }
+        .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 10px; }
+        .tabs button { background: #222; border: 1px solid var(--crimson); color: var(--text); padding: 8px; cursor: pointer; font-size: 0.8rem; }
+        .tabs button:hover { background: var(--crimson); }
+        .tab-content { background: #222; padding: 10px; border-radius: 5px; font-size: 0.85rem; }
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid #333; }
+        .crimson-text { color: var(--crimson); font-weight: bold; }
+        .controls { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+        .discord-btn { background: #5865F2; color: white; border: none; padding: 10px; cursor: pointer; font-weight: bold; }
+        .toggle-btn { background: #333; border: 1px solid var(--crimson); color: var(--text); padding: 8px; cursor: pointer; }
+        #map { flex-grow: 1; height: 100%; }
+        .legend { background: rgba(0,0,0,0.8); padding: 10px; color: white; border-radius: 5px; font-size: 0.8rem; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <h2 class="crimson-title">Sinister's Park</h2>
+        <div class="tabs">
+            <button onclick="showTab('live')">🐾 Live</button>
+            <button onclick="showTab('leaderboard')">🏆 Rank</button>
+            <button onclick="showTab('zones')">🗺️ Zones</button>
+        </div>
+        
+        <div id="live-tab" class="tab-content">
+            <div class="stat-row"><span>🐾 Marks:</span> <span id="points" class="crimson-text">0</span></div>
+            <div class="stat-row"><span>⚔️ Kills:</span> <span id="pKills" class="crimson-text">0</span></div>
+            <div class="stat-row"><span>💀 AI Bodies:</span> <span id="aiKills" class="crimson-text">0</span></div>
+            <div class="stat-row"><span>🦖 Active Dinos:</span> <span id="dinoCount" class="crimson-text">0</span></div>
+            <div class="stat-row"><span>🥚 Eggs:</span> <span id="eggCount" class="crimson-text">0</span></div>
+        </div>
+
+        <div id="leaderboard-tab" class="tab-content" style="display:none;">
+            <table><thead><tr><th>Player</th><th>Kills</th></tr></thead><tbody id="leaderboard-body"></tbody></table>
+        </div>
+
+        <div id="zones-tab" class="tab-content" style="display:none;">
+            <div class="stat-row"><span>📍 Mig Zone:</span> <span id="mig-zone" class="crimson-text">None</span></div>
+            <div class="stat-row"><span>🛡️ Patrol:</span> <span id="patrol-zone" class="crimson-text">None</span></div>
+            <div class="stat-row"><span>⏳ Dino Age:</span> <span id="dino-age" class="crimson-text">0h 0m</span></div>
+        </div>
+
+        <div class="legend">
+            <strong>Legend:</strong><br>🦖 Player | 🍗 AI Animal | 💀 High Kill Zone
+        </div>
+
+        <div class="controls">
+            <button class="discord-btn" onclick="window.location.href='/api/auth/discord'">Login with Discord</button>
+            <button class="toggle-btn" onclick="toggleLayer('migration')">Toggle Migration (Blue)</button>
+            <button class="toggle-btn" onclick="toggleLayer('patrol')">Toggle Patrol (Green)</button>
+            <button class="toggle-btn" onclick="toggleLayer('heatmap')">Toggle Heat Map</button>
+            <button class="toggle-btn" onclick="toggleTracker()">Toggle Personal Tracker</button>
+            <button class="toggle-btn" id="group-btn" style="display:none;" onclick="toggleGroup()">Show Group Members</button>
+        </div>
+    </aside>
+    <main id="map"></main>
+
+    <script>
+        const map = L.map('map', { crs: L.CRS.Simple });
+        L.imageOverlay('/TheIsleMap_May2026.jpg', [[0, 0], [1000, 1000]]).addTo(map);
+        map.fitBounds([[0, 0], [1000, 1000]]);
+
+        const migLayer = L.rectangle([[100, 100], [300, 300]], {color: 'blue', fillOpacity: 0.3});
+        const patrolLayer = L.rectangle([[600, 600], [800, 800]], {color: 'green', fillOpacity: 0.3});
+        const heatLayer = L.heatLayer([[500, 500, 0.5]], {radius: 25});
+        const skullIcon = L.divIcon({ html: '💀', className: '' });
+        L.marker([300, 700], { icon: skullIcon }).addTo(map);
+
+        function toggleLayer(type) {
+            if (type === 'migration') map.hasLayer(migLayer) ? map.removeLayer(migLayer) : migLayer.addTo(map);
+            if (type === 'patrol') map.hasLayer(patrolLayer) ? map.removeLayer(patrolLayer) : patrolLayer.addTo(map);
+            if (type === 'heatmap') map.hasLayer(heatLayer) ? map.removeLayer(heatLayer) : heatLayer.addTo(map);
+        }
+
+        function showTab(id) {
+            document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+            document.getElementById(id + '-tab').style.display = 'block';
+        }
+
+        function teleportTo(coords, growth) {
+            if (growth < 30) { alert("Teleporting to " + coords); } 
+            else { alert("Teleport only available under 30% growth."); }
+        }
+
+        let myMarker = null;
+        function toggleTracker() {
+            if (!myMarker) {
+                myMarker = L.circleMarker([500, 500], { color: 'purple', radius: 8 }).addTo(map);
+                document.getElementById('group-btn').style.display = 'block';
+            } else {
+                myMarker.remove(); myMarker = null;
+                document.getElementById('group-btn').style.display = 'none';
+            }
+        }
+
+        function fetchLiveStats() {
+            fetch('/api/get_live_stats')
+                .then(res => res.json())
+                .then(data => {
+                    if(data.error) return;
+                    document.getElementById('points').innerText = data.marks;
+                    document.getElementById('pKills').innerText = data.pKills;
+                    document.getElementById('aiKills').innerText = data.aiKills;
+                    document.getElementById('dinoCount').innerText = data.dinoCount;
+                    document.getElementById('eggCount').innerText = data.eggCount;
+                    document.getElementById('mig-zone').innerText = data.migZone;
+                    document.getElementById('patrol-zone').innerText = data.patrolZone;
+                    document.getElementById('dino-age').innerText = data.dinoAge;
+                });
+        }
+        setInterval(fetchLiveStats, 30000);
+        fetchLiveStats();
+    </script>
+</body>
+</html>

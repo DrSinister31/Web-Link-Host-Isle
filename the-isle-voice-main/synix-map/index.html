@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYNIX RP - Protected Tactical Grid</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; background: #0c0d14; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        #map { width: 100%; height: 100vh; }
+        #sidebar { position: absolute; top: 20px; left: 20px; z-index: 1000; background: rgba(20, 24, 33, 0.95); color: #fff; padding: 20px; border-radius: 8px; border: 1px solid #00f2fe; width: 260px; box-shadow: 0 4px 25px rgba(0,0,0,0.7); }
+        h3 { margin: 0 0 15px 0; color: #00f2fe; text-transform: uppercase; font-size: 14px; letter-spacing: 1px; }
+        .input-group { margin-bottom: 12px; }
+        label { font-size: 11px; color: #718096; font-weight: bold; display: block; margin-bottom: 4px; }
+        input, select { width: 100%; padding: 8px; background: #141822; border: 1px solid #3a4454; color: #fff; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 8px; background: #00f2fe; border: none; color: #10141d; font-weight: bold; border-radius: 4px; cursor: pointer; margin-top: 5px; }
+        button:hover { background: #4facfe; }
+        .friend-tag { font-size: 12px; color: #a0aec0; background: rgba(255,255,255,0.05); padding: 4px 8px; margin: 4px 0; border-radius: 4px; }
+        .hud-display { margin-top: 15px; border-top: 1px solid #3a4454; padding-top: 15px; }
+        .stat-row { font-size: 13px; margin-bottom: 6px; color: #a0aec0; }
+        .stat-row span { color: #fff; font-weight: bold; float: right; }
+        .alert { color: #ff4e50; font-size: 11px; margin-top: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h3>Synix Control Node</h3>
+        
+        <div class="input-group" id="viewer-group" style="display:none;">
+            <label>VIEWER SESSION ID</label>
+            <input type="text" id="viewer-id" readonly>
+        </div>
+
+        <div class="input-group">
+            <label>ADD FRIEND TO RADAR</label>
+            <input type="text" id="friend-id" placeholder="Friend's SteamID">
+            <button onclick="registerFriend()">Link Network</button>
+        </div>
+
+        <div id="friend-list-panel"></div>
+
+        <div class="hud-display">
+            <label>SESSION TELEMETRY</label>
+            <div class="stat-row">Profile Rank: <span id="hud-role">-</span></div>
+            <div class="stat-row">Species: <span id="hud-species">-</span></div>
+            <div class="stat-row">Growth Factor: <span id="hud-growth">0.0%</span></div>
+            <div class="stat-row">Wallet Marks: <span id="hud-marks">0</span></div>
+        </div>
+
+        <div class="hud-display" id="tp-panel" style="display:none;">
+            <label>SAFETY SPAWN ESCAPE</label>
+            <select id="tp-destination">
+                <option value="north_plains">North Plains Sector</option>
+                <option value="swamp_sanctuary">Swamp Sanctuary</option>
+                <option value="center_river">Center River Oasis</option>
+            </select>
+            <button onclick="requestSafeTeleport()" style="background: #a8ff78; color: #10141d;">Trigger Warp</button>
+            <div id="tp-error-msg" class="alert"></div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+<script>
+    const gatewayBounds = [[-4500, -4500], [4500, 4500]];
+    const map = L.map('map', { crs: L.CRS.Simple, minZoom: -3, maxZoom: 3 });
+
+    L.imageOverlay('map_grid.png', gatewayBounds).addTo(map);
+    map.fitBounds(gatewayBounds);
+    map.setView([0, 0], -2);
+
+    let activeMarkers = {};
+    let trackingFriends = new Set();
+
+    // AUTO-LOAD RECOVER STEAMID FROM REDIRECT URL 
+    window.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const steamId = urlParams.get('steamid');
+        if (steamId) {
+            document.getElementById('viewer-id').value = steamId;
+            // Keeps things clean for admins, unhides text element if missing query param
+        } else {
+            document.getElementById('viewer-group').style.display = 'block';
+        }
+    });
+
+    function registerFriend() {
+        const id = document.getElementById('friend-id').value.trim();
+        if (id) {
+            trackingFriends.add(id);
+            const tag = document.createElement('div');
+            tag.className = 'friend-tag';
+            tag.innerText = `Linked: ${id}`;
+            document.getElementById('friend-list-panel').appendChild(tag);
+            document.getElementById('friend-id').value = '';
+        }
+    }
+
+    function requestSafeTeleport() {
+        const viewerId = document.getElementById('viewer-id').value.trim();
+        const dest = document.getElementById('tp-destination').value;
+        document.getElementById('tp-error-msg').innerText = "";
+
+        fetch(`http://localhost:8000/api/teleport`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ viewer_steam_id: viewerId, destination: dest })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                document.getElementById('tp-error-msg').innerText = data.error;
+            } else {
+                alert(`Success: ${data.message}`);
+            }
+        })
+        .catch(err => console.error("TP network drop:", err));
+    }
+
+    function processRadarSweep() {
+        const viewerId = document.getElementById('viewer-id').value.trim();
+        if (!viewerId) return;
+
+        fetch(`http://localhost:8000/api/map-data?viewer_steam_id=${viewerId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) return;
+
+                // Handle composite array payload returned from new endpoint
+                const players = data.players;
+                
+                // Track viewer status values
+                document.getElementById('hud-role').innerText = data.viewer_role;
+                document.getElementById('hud-species').innerText = data.viewer_species;
+                document.getElementById('hud-growth').innerText = (data.viewer_growth * 100).toFixed(1) + "%";
+                document.getElementById('hud-marks').innerText = Number(data.viewer_marks).toLocaleString();
+
+                // Toggle visibility loop for the Safety Warp option UI
+                if (data.can_teleport) {
+                    document.getElementById('tp-panel').style.display = 'block';
+                } else {
+                    document.getElementById('tp-panel').style.display = 'none';
+                }
+
+                let updatedIds = new Set();
+
+                players.forEach(p => {
+                    updatedIds.add(p.steam_id);
+                    
+                    if (p.steam_id !== viewerId && !trackingFriends.has(p.steam_id) && p.group_id === null) {
+                        return; 
+                    }
+
+                    let blipColor = "#00f2fe"; 
+                    if (trackingFriends.has(p.steam_id)) blipColor = "#a8ff78"; 
+                    if (p.steam_id !== viewerId && p.group_id === null) blipColor = "#ff4e50"; 
+
+                    const iconHtml = `<div style="width:14px; height:14px; background:${blipColor}; border:2px solid #fff; border-radius:50%; box-shadow: 0 0 10px ${blipColor};"></div>`;
+
+                    if (activeMarkers[p.steam_id]) {
+                        activeMarkers[p.steam_id].setLatLng([p.y, p.x]);
+                    } else {
+                        activeMarkers[p.steam_id] = L.marker([p.y, p.x], {
+                            icon: L.divIcon({ className: 'radar-blip', html: iconHtml, iconSize: [14,14] })
+                        }).addTo(map).bindPopup(`<b>${p.species}</b><br>Marks: ${Number(p.marks).toLocaleString()}`);
+                    }
+                });
+
+                Object.keys(activeMarkers).forEach(id => {
+                    if (!updatedIds.has(id)) {
+                        map.removeLayer(activeMarkers[id]);
+                        delete activeMarkers[id];
+                    }
+                });
+            })
+            .catch(err => console.error("Sync drop:", err));
+    }
+
+    setInterval(processRadarSweep, 4000);
+</script>
+</body>
+</html>

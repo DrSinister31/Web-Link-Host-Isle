@@ -1,0 +1,58 @@
+{
+  "mode": "rcon",
+  "poll_interval_sec": 5.0,
+  "identity_map_file": "identity_map.json",
+  "rcon": {
+    "host": "172.93.104.174",
+    "port": 2463,
+    "password": "Familia1!",
+    "protocol": "evrima",
+    "line_ending": "\\r\\n",
+    "send_password_first": true,
+    "read_idle_ms": 350,
+    "read_timeout_sec": 4.0,
+    "commands": [
+      "PlayerList",
+      "PlayerData"
+    ]
+  },
+  "proximity": {
+    "audible_distance": 30000.0,
+    "fade_start": 12000.0,
+    "shard_size": 45000.0,
+    "channel_prefix": "TransportShard_",
+    "unknown_channel": "The Isle - Lobby",
+    "hash_salt": "Awesome",
+    "pan_width": 20000.0
+  },
+  "mumble": {
+    "adapter": "dry_run",
+    "root_channel": "The Isle - Lobby",
+    "dry_run_print_every_tick": true
+  },
+  "falloff_server": {
+    "enabled": true,
+    "host": "0.0.0.0",
+    "port": 8890,
+    "api_key": "drsinister31",
+    "send_interval_sec": 1.0
+  },
+  "verify": {
+    "enabled": false,
+    "command": "!verify",
+    "code_ttl_sec": 300,
+    "game_chat_enabled": true,
+    "game_command": "!verify",
+    "game_log_file": "/opt/theisle/server/TheIsle/Saved/Logs/TheIsle.log",
+    "game_code_mumble_fallback": true,
+    "game_code_display_sec": 60,
+    "game_code_repeat_interval_sec": 8,
+    "game_message_prefix": "\n\n"
+  },
+  "logs": {
+    "directory": "logs"
+  },
+  "database": {
+    "path": "C:/sqlite/synix_rp_backend.db"
+  }
+}

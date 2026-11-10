@@ -117,7 +117,7 @@ bash synix_root/podman-deploy.sh
 
 - [ ] Set `DISCORD_TOKEN` in `.env` (from Discord Developer Portal)
 - [ ] Optional: Set `GEMINI_API_KEY` in `.env` (for AI responses)
-- [ ] Optional: Set `STEAM_API_KEY` (already configured: 90B7269D15C74A8EB47BCB48B5349214)
+ - [ ] Set `STEAM_API_KEY` in your local `.env` or secret manager. Never commit API credentials to source control.
 
 ### Before AI Operator on Linux
 

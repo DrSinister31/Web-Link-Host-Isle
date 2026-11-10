@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import urllib.parse
 import time
@@ -17,7 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-STEAM_API_KEY = "90B7269D15C74A8EB47BCB48B5349214"
+STEAM_API_KEY = os.environ.get("STEAM_API_KEY", "")
 BACKEND_URL = "http://localhost:8000"
 FRONTEND_URL = "https://sinisters-map.vercel.app"
 DB_PATH = "C:/sqlite/synix_rp_backend.db"

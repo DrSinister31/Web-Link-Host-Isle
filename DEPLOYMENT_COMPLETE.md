@@ -16,7 +16,7 @@ All infrastructure components are configured, built, and ready to run.
   - Teleportation system (/api/teleport)
   - Health check: GET /health
 - **Environment**:
-  - STEAM_API_KEY: 90B7269D15C74A8EB47BCB48B5349214
+  - STEAM_API_KEY: [REDACTED—ROTATE KEY]
   - Database: /app/data/synix_rp_backend.db
 
 ### 2. **synix-bot** (Discord.py + Gemini AI)
